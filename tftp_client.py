@@ -20,8 +20,8 @@ def usage():
 	print "name of the file you want to put/get"
 	print ""
 	print "Examples:"
-	print "tftpC tserver.ru.is get texti.doc"
-	print "tftpC tserver.ru.is put texti.doc"
+	print "python tftp_client.py localhost get texti.txt"
+	print "python tftp_client.py localhost put texti.txt"
 	print ""
 
 	sys.exit(1)
@@ -50,23 +50,84 @@ def main():
 
 	if action == 'get':
 		sendpacket = conStruct(1,filename,mode)
+		s.sendto(sendpacket,(host,port))
+
+		try:
+			createFile = open(filename, 'w')
+		except Exception:
+			print "Can't open " , filename
+
+		totalDatalen = 0
+		blockCount = 1
+		errors = 0
+
+		while True:
+			while errors < 3:
+				try:
+					data, remoteSocket = s.recvfrom(4096)
+					Opcode = struct.unpack('!H', data[0:2])[0]
+					errors = 0
+					break
+				except Exception:
+					s.sendto(sendpacket, (host,port))
+					Opcode = 'Timeout'
+					errors += 1
+
+			if Opcode == 3:
+				blockNo = struct.unpack('!H',data[2:4])[0]
+				if blockNo != blockCount:
+					print('wrong block')
+					createFile.close()
+					break
+
+				blockCount +=1
+				if blockCount == 65536:
+					blockCount = 1
+
+				dataPayload = data[4:]
+
+				try:
+					createFile.write(dataPayload)
+				except Exception:
+					print('cant write data')
+					createFile.close()
+					break
+
+				totalDatalen += len(dataPayload)
+				sendpacket = struct.pack(b'!2H', 4, blockNo)
+				s.sendto(sendpacket, remoteSocket)
+
+				if len(dataPayload) < 512:
+					print('have enough, bye')
+					createFile.close()
+					break
+
+			elif Opcode == 5:
+
+				errCode = struct.unpack('!H',data[2:4])[0]
+				errString = data[4:-1]
+				print('Error code: ', errCode)
+				createFile.close()
+				break
+
+			elif Opcode == 'Timeout':
+				print('Timed out')
+				createFile.close()
+
+			else:
+				print('Unknown error')
+				createFile.close()
+
+		
+
+
 	elif action == 'put':
 		sendpacket = conStruct(2,filename,mode)
 
-	#print sendpacket
 
-	s.sendto(sendpacket,(host,port))
+	
 
-	# data = s.recvfrom(512)
-	# print data
-
-	createFile = open(filename, 'w')
-
-	data, remoteSocket = s.recvfrom(4096)
-	Opcode = struct.unpack('!H', data[0:2])[0]
-
-	createFile.write(data)
-	createFile.close()
+	
 
 	
 
