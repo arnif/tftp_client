@@ -29,12 +29,14 @@ def usage():
 
 def main():
 
-	if len(sys.argv) < 4:
+	#ef ekki er slegid inn rettur fjoldi argv er notandanum kennt ad nota forritid
+	if len(sys.argv) < 4: 
 		usage()
 
 	host = sys.argv[1]
 	action = sys.argv[2]
 
+	# passa ad taka a moti ha og la stofum
 	if 'put' not in action.lower():
 		if 'get' not in action.lower():
 			usage()
@@ -42,10 +44,13 @@ def main():
 	filename = sys.argv[3]
 	mode = 'octet'
 
-	s = socket(AF_INET, SOCK_DGRAM)
-	s.settimeout(10)
+	try:
+		s = socket(AF_INET, SOCK_DGRAM)
+		s.settimeout(10)
 
-	print 'connection'
+		print 'Connected to ', host
+	except Exception:
+		print 'Could not connect'
 
 
 	if action == 'get':
@@ -53,7 +58,7 @@ def main():
 		s.sendto(sendpacket,(host,port))
 
 		try:
-			createFile = open(filename, 'w')
+			createFile = open(filename, 'wb')
 		except Exception:
 			print "Can't open " , filename
 
@@ -75,13 +80,14 @@ def main():
 
 			if Opcode == 3:
 				blockNo = struct.unpack('!H',data[2:4])[0]
-				if blockNo != blockCount:
-					print('wrong block')
-					createFile.close()
-					break
+				# if blockNo != blockCount:
+				# 	print('wrong block')
+				# 	createFile.close()
+				# 	break
 
 				blockCount +=1
 				if blockCount == 65536:
+					#passa overflow
 					blockCount = 1
 
 				dataPayload = data[4:]
@@ -104,9 +110,9 @@ def main():
 
 			elif Opcode == 5:
 
-				errCode = struct.unpack('!H',data[2:4])[0]
-				errString = data[4:-1]
-				print('Error code: ', errCode)
+				errCode = struct.unpack('!H',data[2:4])[0] 
+				errString = data[4:-1] 
+				print('Error code: ', errCode, 'Error: ', errString)
 				createFile.close()
 				break
 
@@ -119,17 +125,73 @@ def main():
 				createFile.close()
 
 		
-
-
 	elif action == 'put':
 		sendpacket = conStruct(2,filename,mode)
 
+		s.sendto(sendpacket,(host,port))
 
-	
+		try:
+			sendFile = open(filename, 'rb')
+		except Exception:
+			print "Can't open " , filename
 
-	
+		endFlag = False
+		totalDatalen = 0
+		blockCount = 0
 
-	
+		while True:
+
+			data, remoteSocket = s.recvfrom(4096)
+			Opcode = struct.unpack('!H', data[0:2])[0]
+
+			if Opcode == 4:
+
+				if endFlag == True:
+					sendFile.close()
+					print('Done')
+					break
+
+				blockNo = struct.unpack('!H', data[2:4])[0]
+
+				# if blockNo != blockCount:
+				# 	print('wrong block')
+				# 	sendFile.close()
+				# 	break
+
+				blockNo +=1
+				if blockNo == 65536:
+					#passa overflow
+					blockNo = 1
+
+				dataChunk = sendFile.read(512)
+
+				dataPacket = struct.pack(b'!2H', 3, blockNo) + dataChunk
+				s.sendto(dataPacket, remoteSocket)
+
+				totalDatalen += len(dataChunk)
+
+				blockCount += 1
+
+				if blockCount == 65536:
+					blockCount = 0
+
+				if len(dataChunk) < 512:
+					endFlag = True
+
+			elif Opcode == 5:
+
+				errCode = struct.unpack('!H', data[2:4])[0]
+				errString = data[4:-1]
+				print("error code ",errString)
+				sendFile.close()
+				break
+
+			else:
+				print('unknown error')
+				sendFile.close()
+
+
+
 
 
 def conStruct(opcode,filename,mode):
