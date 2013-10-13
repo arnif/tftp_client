@@ -50,9 +50,10 @@ def main():
 
 		print 'Connected to ', host
 	except Exception:
-		print 'Could not connect'
+		print 'Could not connect', Exception
 
 
+	#get adgerdin
 	if action == 'get':
 		sendpacket = conStruct(1,filename,mode)
 		s.sendto(sendpacket,(host,port))
@@ -63,11 +64,12 @@ def main():
 			print "Can't open " , filename
 
 		totalDatalen = 0
-		blockCount = 1
+		# blockCount = 1
 		errors = 0
 
 		while True:
-			while errors < 3:
+
+			while errors < 2:
 				try:
 					data, remoteSocket = s.recvfrom(4096)
 					Opcode = struct.unpack('!H', data[0:2])[0]
@@ -85,26 +87,26 @@ def main():
 				# 	createFile.close()
 				# 	break
 
-				blockCount +=1
-				if blockCount == 65536:
-					#passa overflow
-					blockCount = 1
+				# blockCount +=1
+				# if blockCount == 65536:
+				# 	#passa overflow
+				# 	blockCount = 1
 
-				dataPayload = data[4:]
+				dataStuff = data[4:]
 
 				try:
-					createFile.write(dataPayload)
+					createFile.write(dataStuff)
 				except Exception:
-					print('cant write data')
+					print("Can't write data")
 					createFile.close()
 					break
 
-				totalDatalen += len(dataPayload)
+				totalDatalen += len(dataStuff)
 				sendpacket = struct.pack(b'!2H', 4, blockNo)
 				s.sendto(sendpacket, remoteSocket)
 
-				if len(dataPayload) < 512:
-					print('have enough, bye')
+				if len(dataStuff) < 512:
+					print('File transfer completed. Thank you come again.')
 					createFile.close()
 					break
 
@@ -124,10 +126,11 @@ def main():
 				print('Unknown error')
 				createFile.close()
 
-		
+
+
+	#put adgerdin		
 	elif action == 'put':
 		sendpacket = conStruct(2,filename,mode)
-
 		s.sendto(sendpacket,(host,port))
 
 		try:
@@ -135,7 +138,7 @@ def main():
 		except Exception:
 			print "Can't open " , filename
 
-		endFlag = False
+		# endFlag = False
 		totalDatalen = 0
 		blockCount = 0
 
@@ -146,12 +149,13 @@ def main():
 
 			if Opcode == 4:
 
-				if endFlag == True:
-					sendFile.close()
-					print('Done')
-					break
+				# if endFlag == True:
+				# 	sendFile.close()
+				# 	print('Done')
+				# 	break
 
 				blockNo = struct.unpack('!H', data[2:4])[0]
+				# print blockNo
 
 				# if blockNo != blockCount:
 				# 	print('wrong block')
@@ -159,35 +163,37 @@ def main():
 				# 	break
 
 				blockNo +=1
-				if blockNo == 65536:
-					#passa overflow
-					blockNo = 1
+				# if blockNo == 65536:
+				# 	#passa overflow
+				# 	blockNo = 1
+				# print blockNo
 
 				dataChunk = sendFile.read(512)
-
 				dataPacket = struct.pack(b'!2H', 3, blockNo) + dataChunk
 				s.sendto(dataPacket, remoteSocket)
 
 				totalDatalen += len(dataChunk)
 
-				blockCount += 1
+				# blockCount += 1
 
-				if blockCount == 65536:
-					blockCount = 0
+				# if blockCount == 65536:
+				# 	blockCount = 0
 
 				if len(dataChunk) < 512:
-					endFlag = True
+					print('File has been sent. Thank you come again.')
+					sendFile.close()
+					break
 
 			elif Opcode == 5:
 
 				errCode = struct.unpack('!H', data[2:4])[0]
 				errString = data[4:-1]
-				print("error code ",errString)
+				print('Error code ', errCode, ' Error: ' ,errString)
 				sendFile.close()
 				break
 
 			else:
-				print('unknown error')
+				print('Unknown error')
 				sendFile.close()
 
 
