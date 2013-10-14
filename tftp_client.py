@@ -36,7 +36,7 @@ def main():
 	host = sys.argv[1]
 	action = sys.argv[2]
 
-	# passa ad taka a moti ha og la stofum
+	#passa ad taka a moti ha og la stofum
 	if 'put' not in action.lower():
 		if 'get' not in action.lower():
 			usage()
@@ -44,6 +44,7 @@ def main():
 	filename = sys.argv[3]
 	mode = 'octet'
 
+	#opna socket
 	try:
 		s = socket(AF_INET, SOCK_DGRAM)
 		s.settimeout(10)
@@ -58,40 +59,25 @@ def main():
 		sendpacket = conStruct(1,filename,mode)
 		s.sendto(sendpacket,(host,port))
 
+		#reyni ad bua til skjal
 		try:
 			createFile = open(filename, 'wb')
 		except Exception:
 			print "Can't open " , filename
 
 		totalDatalen = 0
-		# blockCount = 1
-		errors = 0
 
 		while True:
+			#fa gogn fra servernum
+			try:
+				data, remoteSocket = s.recvfrom(4096)
+				Opcode = struct.unpack('!H', data[0:2])[0]
+			except Exception:
+				Opcode = 'Timeout'
 
-			while errors < 2:
-				try:
-					data, remoteSocket = s.recvfrom(4096)
-					Opcode = struct.unpack('!H', data[0:2])[0]
-					errors = 0
-					break
-				except Exception:
-					s.sendto(sendpacket, (host,port))
-					Opcode = 'Timeout'
-					errors += 1
-
+			#saekjir gognin ur skjalinu
 			if Opcode == 3:
 				blockNo = struct.unpack('!H',data[2:4])[0]
-				# if blockNo != blockCount:
-				# 	print('wrong block')
-				# 	createFile.close()
-				# 	break
-
-				# blockCount +=1
-				# if blockCount == 65536:
-				# 	#passa overflow
-				# 	blockCount = 1
-
 				dataStuff = data[4:]
 
 				try:
@@ -105,11 +91,14 @@ def main():
 				sendpacket = struct.pack(b'!2H', 4, blockNo)
 				s.sendto(sendpacket, remoteSocket)
 
+				#ef staerdin a gognunum i skjalinu er ordid minna en 512 bytes
+				#tha lokar thad skjalinu
 				if len(dataStuff) < 512:
 					print('File transfer completed. Thank you come again.')
 					createFile.close()
 					break
 
+			#ef upp kemur villa
 			elif Opcode == 5:
 
 				errCode = struct.unpack('!H',data[2:4])[0] 
@@ -133,57 +122,41 @@ def main():
 		sendpacket = conStruct(2,filename,mode)
 		s.sendto(sendpacket,(host,port))
 
+		#les skjalid
 		try:
 			sendFile = open(filename, 'rb')
 		except Exception:
 			print "Can't open " , filename
 
-		# endFlag = False
 		totalDatalen = 0
 		blockCount = 0
 
 		while True:
+			#fa gogn fra servernum
+			try:
+				data, remoteSocket = s.recvfrom(4096)
+				Opcode = struct.unpack('!H', data[0:2])[0]
+				
+			except Exception:
+				opcode = 'Timeout'
 
-			data, remoteSocket = s.recvfrom(4096)
-			Opcode = struct.unpack('!H', data[0:2])[0]
-
+			#skrifar gogn af client skjalinu a server skjalid	
 			if Opcode == 4:
-
-				# if endFlag == True:
-				# 	sendFile.close()
-				# 	print('Done')
-				# 	break
-
 				blockNo = struct.unpack('!H', data[2:4])[0]
-				# print blockNo
-
-				# if blockNo != blockCount:
-				# 	print('wrong block')
-				# 	sendFile.close()
-				# 	break
-
 				blockNo +=1
-				# if blockNo == 65536:
-				# 	#passa overflow
-				# 	blockNo = 1
-				# print blockNo
-
 				dataChunk = sendFile.read(512)
 				dataPacket = struct.pack(b'!2H', 3, blockNo) + dataChunk
 				s.sendto(dataPacket, remoteSocket)
-
 				totalDatalen += len(dataChunk)
 
-				# blockCount += 1
-
-				# if blockCount == 65536:
-				# 	blockCount = 0
-
+				#ef staerdin a gognunum i skjalinu er ordid minna en 512 bytes
+				#tha lokar thad skjalinu
 				if len(dataChunk) < 512:
 					print('File has been sent. Thank you come again.')
 					sendFile.close()
 					break
 
+			#ef upp kemur vill
 			elif Opcode == 5:
 
 				errCode = struct.unpack('!H', data[2:4])[0]
@@ -192,6 +165,10 @@ def main():
 				sendFile.close()
 				break
 
+			elif Opcode == 'Timeout':
+				print('Timed out')
+				sendFile.close()
+
 			else:
 				print('Unknown error')
 				sendFile.close()
@@ -199,7 +176,7 @@ def main():
 
 
 
-
+#utfaerir upphafspakkann
 def conStruct(opcode,filename,mode):
  return  struct.pack('!H' + str(len(filename)+1) + 's6s', opcode , filename,mode)
     
