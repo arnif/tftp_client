@@ -5,7 +5,7 @@ import sys
 port = 69
 
 def usage():
-	#fall sem utskyrir hvernig nota skal clientinn
+	#fall sem utskyrir hvernig nota skal clientinn mjog snidugt
 	print ""
 	print "Usage: tftp_client [SERVER] [ACTION] [FILE]"
 	print ""
@@ -51,7 +51,6 @@ def main():
 		print 'Connected to ', host
 	except Exception:
 		print 'Could not connect', Exception
-
 
 	#get adgerdin, RRQ request
 	if action == 'get':
