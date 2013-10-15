@@ -26,7 +26,6 @@ def usage():
 
 	sys.exit(1)
 
-
 def main():
 
 	#ef ekki er slegid inn rettur fjoldi argv er notandanum kennt ad nota forritid
@@ -54,9 +53,11 @@ def main():
 		print 'Could not connect', Exception
 
 
-	#get adgerdin
+	#get adgerdin, RRQ request
 	if action == 'get':
+		#Kallad a construct sem byr til pakka sem sendir RRQ request 
 		sendpacket = conStruct(1,filename,mode)
+		#Pakkinn sendur a server
 		s.sendto(sendpacket,(host,port))
 
 		#reyni ad bua til skjal
@@ -76,6 +77,7 @@ def main():
 				Opcode = 'Timeout'
 
 			#saekjir gognin ur skjalinu
+			#Ef server sendir til baka DATA
 			if Opcode == 3:
 				blockNo = struct.unpack('!H',data[2:4])[0]
 				dataStuff = data[4:]
@@ -99,6 +101,7 @@ def main():
 					break
 
 			#ef upp kemur villa
+			#Server sendir villu til baka
 			elif Opcode == 5:
 
 				errCode = struct.unpack('!H',data[2:4])[0] 
@@ -117,9 +120,11 @@ def main():
 
 
 
-	#put adgerdin		
+	#put adgerdin, WRQ request	
 	elif action == 'put':
+		#Kallad a construct sem byr til pakka sem sendir WRQ request
 		sendpacket = conStruct(2,filename,mode)
+		#pakkinn sendur a server
 		s.sendto(sendpacket,(host,port))
 
 		#les skjalid
@@ -129,18 +134,18 @@ def main():
 			print "Can't open " , filename
 
 		totalDatalen = 0
-		blockCount = 0
 
 		while True:
 			#fa gogn fra servernum
 			try:
 				data, remoteSocket = s.recvfrom(4096)
 				Opcode = struct.unpack('!H', data[0:2])[0]
-				
+
 			except Exception:
 				opcode = 'Timeout'
 
-			#skrifar gogn af client skjalinu a server skjalid	
+			#skrifar gogn af client skjalinu a server skjalid
+			#Ef serverinn sendir fra ser ACK	
 			if Opcode == 4:
 				blockNo = struct.unpack('!H', data[2:4])[0]
 				blockNo +=1
@@ -156,7 +161,8 @@ def main():
 					sendFile.close()
 					break
 
-			#ef upp kemur vill
+			#ef upp kemur villa
+			#Server sendir Error til baka
 			elif Opcode == 5:
 
 				errCode = struct.unpack('!H', data[2:4])[0]
@@ -175,13 +181,15 @@ def main():
 
 
 
-
-#utfaerir upphafspakkann
+#2 bytes     string    1 byte     string   1 byte
+#------------------------------------------------
+#| Opcode |  Filename  |   0  |    Mode    |   0  |
+#------------------------------------------------
+#utfaerir upphafspakkann. Kallad a tetta fall tegar er notad put og get og ta er opcode
+#annadhvort 1 eda 2. 
 def conStruct(opcode,filename,mode):
  return  struct.pack('!H' + str(len(filename)+1) + 's6s', opcode , filename,mode)
     
     
-
-
 if __name__ == "__main__":
 	main()
